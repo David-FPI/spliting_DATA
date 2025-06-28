@@ -89,12 +89,14 @@ if st.button("🚀 Phân chia DATA"):
             st.dataframe(df, use_container_width=True)
             
             # Chuẩn bị chuỗi tab-separated
-            csv_str = df.to_csv(sep='\t', index=False)
+            csv_str = df.to_csv(sep='\t', index=False, header=False)
+            escaped_csv_str = csv_str.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
             
             # Tạo giao diện copy
             st.subheader("📋 Copy nhanh sang Excel / Google Sheets")
             components.html(f"""
-                <textarea id="dataArea" rows="15" style="width:100%">{csv_str}</textarea>
+                <textarea id="dataArea" rows="15" style="width:100%">{escaped_csv_str}</textarea>
                 <button id="copyBtn" onclick="copyToClipboard()"
                         style="margin-top:10px;padding:6px 16px;font-weight:bold;background-color:#4CAF50;color:white;border:none;border-radius:4px;cursor:pointer">
                     📋 Copy vào Clipboard
