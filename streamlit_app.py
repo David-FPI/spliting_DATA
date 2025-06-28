@@ -104,21 +104,22 @@ if st.button("🚀 Phân chia DATA"):
                 <p id="copyMsg" style="font-size: 0.9rem; color: grey; margin-top:5px;"></p>
             
                 <script>
-                function copyToClipboard() {
+                function copyToClipboard() {{
                     const text = document.getElementById("dataArea").value;
-                    navigator.clipboard.writeText(text).then(function() {
+                    navigator.clipboard.writeText(text).then(function() {{
                         var btn = document.getElementById("copyBtn");
                         btn.innerHTML = "✅ Đã copy!";
                         btn.style.backgroundColor = "#2E7D32";
                         document.getElementById("copyMsg").innerText = "➡️ Dán vào Excel hoặc Google Sheets";
-                        setTimeout(function() {
+                        setTimeout(function() {{
                             btn.innerHTML = "📋 Copy vào Clipboard";
                             btn.style.backgroundColor = "#4CAF50";
-                        }, 2000);
-                    });
-                }
+                        }}, 2000);
+                    }});
+                }}
                 </script>
             """, height=420)
+
 
 
             # st.subheader("📊 Kết quả phân chia")
