@@ -85,15 +85,29 @@ if st.button("🚀 Phân chia DATA"):
 
             df = pd.DataFrame({"Tên TV": assigned_tv, "Tên CS": assigned_cs})
 
-            # st.subheader("📊 Kết quả phân chia")
-            # st.dataframe(df, use_container_width=True)
             st.subheader("📊 Kết quả phân chia")
             st.dataframe(df, use_container_width=True)
             
-            st.subheader("📋 Copy nhanh sang Excel / Google Sheets")
+            # Chuẩn bị chuỗi tab-separated
             csv_str = df.to_csv(sep='\t', index=False)
-            st.text_area("📎 Dữ liệu dạng bảng (Tab Separated):", value=csv_str, height=300)
-            st.caption("➡️ Ctrl+A → Ctrl+C để copy toàn bộ và dán trực tiếp vào Excel hoặc Google Sheets.")
+            
+            # Tạo giao diện copy
+            st.subheader("📋 Copy nhanh sang Excel / Google Sheets")
+            components.html(f"""
+                <textarea id="dataArea" rows="15" style="width:100%">{csv_str}</textarea>
+                <button onclick="navigator.clipboard.writeText(document.getElementById('dataArea').value)"
+                        style="margin-top:10px;padding:6px 16px;font-weight:bold;background-color:#4CAF50;color:white;border:none;border-radius:4px;cursor:pointer">
+                    📋 Copy vào Clipboard
+                </button>
+                <p style="font-size: 0.9rem; color: grey;">➡️ Dán vào Excel hoặc Google Sheets sau khi bấm nút copy.</p>
+            """, height=400)
+
+            # st.subheader("📊 Kết quả phân chia")
+            # st.dataframe(df, use_container_width=True)
+            # st.subheader("📋 Copy nhanh sang Excel / Google Sheets")
+            # csv_str = df.to_csv(sep='\t', index=False)
+            # st.text_area("📎 Dữ liệu dạng bảng (Tab Separated):", value=csv_str, height=300)
+            # st.caption("➡️ Ctrl+A → Ctrl+C để copy toàn bộ và dán trực tiếp vào Excel hoặc Google Sheets.")
 
             st.subheader("📈 Thống kê")
             col3, col4 = st.columns(2)
