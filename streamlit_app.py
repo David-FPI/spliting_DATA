@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import math
 import io
-
+import streamlit.components.v1 as components
 st.set_page_config(page_title="Phân chia DATA thông minh", layout="wide")
 st.title("📊 Chia Đều DATA Cho TV và CS")
 
