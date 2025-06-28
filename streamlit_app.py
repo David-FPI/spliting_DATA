@@ -1,290 +1,122 @@
-from collections import defaultdict
-from pathlib import Path
-import sqlite3
-
 import streamlit as st
-import altair as alt
 import pandas as pd
+import math
+import io
 
+st.set_page_config(page_title="Phân chia DATA thông minh", layout="wide")
+st.title("📊 Chia Đều DATA Cho TV và CS (Có hỗ trợ nhân sự chia ít)")
 
-# Set the title and favicon that appear in the Browser's tab bar.
-st.set_page_config(
-    page_title="Inventory tracker",
-    page_icon=":shopping_bags:",  # This is an emoji shortcode. Could be a URL too.
-)
+# Input từ người dùng
+with st.sidebar:
+    st.header("⚙️ Cấu hình")
+    total_data = st.number_input("Tổng số lượng DATA:", min_value=1, step=1, help="Tổng lượng data bạn muốn chia đều")
+    low_default = st.number_input("Số dòng chia ít (default):", min_value=1, value=9, step=1, help="Những người được đánh dấu 'chia ít' sẽ nhận số dòng này")
 
+st.markdown("---")
 
-# -----------------------------------------------------------------------------
-# Declare some useful functions.
+col1, col2 = st.columns(2)
+with col1:
+    tv_names_raw = st.text_area("📥 Danh sách Tư Vấn (TV):", placeholder="Nhập tên, cách nhau bởi dấu phẩy hoặc xuống dòng", help="Những người cần chia DATA bên nhóm TV")
+    tv_low_raw = st.text_area("🔽 Tên TV chia ít DATA:", placeholder="Không bắt buộc", help="Nhập tên người TV cần chia ít DATA")
 
+with col2:
+    cs_names_raw = st.text_area("📥 Danh sách Chăm Sóc (CS):", placeholder="Nhập tên, cách nhau bởi dấu phẩy hoặc xuống dòng", help="Những người cần chia DATA bên nhóm CS")
+    cs_low_raw = st.text_area("🔽 Tên CS chia ít DATA:", placeholder="Không bắt buộc", help="Nhập tên người CS cần chia ít DATA")
 
-def connect_db():
-    """Connects to the sqlite database."""
+# Xử lý input
+def parse_names(raw):
+    return [name.strip() for name in raw.replace(",", "\n").splitlines() if name.strip()]
 
-    DB_FILENAME = Path(__file__).parent / "inventory.db"
-    db_already_exists = DB_FILENAME.exists()
+tv_names = parse_names(tv_names_raw)
+cs_names = parse_names(cs_names_raw)
+tv_low = set(parse_names(tv_low_raw))
+cs_low = set(parse_names(cs_low_raw))
 
-    conn = sqlite3.connect(DB_FILENAME)
-    db_was_just_created = not db_already_exists
+# Hàm phân bổ data
 
-    return conn, db_was_just_created
+def assign_data(names, low_names, total, low_default=9):
+    low_list = [name for name in names if name in low_names]
+    normal_list = [name for name in names if name not in low_names]
 
+    total_low = low_default * len(low_list)
+    remaining = total - total_low
 
-def initialize_data(conn):
-    """Initializes the inventory table with some data."""
-    cursor = conn.cursor()
+    if remaining < 0:
+        raise ValueError("Tổng số DATA quá nhỏ để chia cho nhóm 'chia ít'")
+    if remaining > 0 and len(normal_list) == 0:
+        raise ValueError("Không có ai để chia phần DATA còn lại")
 
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS inventory (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            item_name TEXT,
-            price REAL,
-            units_sold INTEGER,
-            units_left INTEGER,
-            cost_price REAL,
-            reorder_point INTEGER,
-            description TEXT
-        )
-        """
-    )
+    per_person = remaining // len(normal_list) if normal_list else 0
+    extra = remaining % len(normal_list) if normal_list else 0
 
-    cursor.execute(
-        """
-        INSERT INTO inventory
-            (item_name, price, units_sold, units_left, cost_price, reorder_point, description)
-        VALUES
-            -- Beverages
-            ('Bottled Water (500ml)', 1.50, 115, 15, 0.80, 16, 'Hydrating bottled water'),
-            ('Soda (355ml)', 2.00, 93, 8, 1.20, 10, 'Carbonated soft drink'),
-            ('Energy Drink (250ml)', 2.50, 12, 18, 1.50, 8, 'High-caffeine energy drink'),
-            ('Coffee (hot, large)', 2.75, 11, 14, 1.80, 5, 'Freshly brewed hot coffee'),
-            ('Juice (200ml)', 2.25, 11, 9, 1.30, 5, 'Fruit juice blend'),
+    result = []
+    stats = {}
 
-            -- Snacks
-            ('Potato Chips (small)', 2.00, 34, 16, 1.00, 10, 'Salted and crispy potato chips'),
-            ('Candy Bar', 1.50, 6, 19, 0.80, 15, 'Chocolate and candy bar'),
-            ('Granola Bar', 2.25, 3, 12, 1.30, 8, 'Healthy and nutritious granola bar'),
-            ('Cookies (pack of 6)', 2.50, 8, 8, 1.50, 5, 'Soft and chewy cookies'),
-            ('Fruit Snack Pack', 1.75, 5, 10, 1.00, 8, 'Assortment of dried fruits and nuts'),
+    for i, name in enumerate(normal_list):
+        count = per_person + (1 if i < extra else 0)
+        result.extend([name] * count)
+        stats[name] = count
 
-            -- Personal Care
-            ('Toothpaste', 3.50, 1, 9, 2.00, 5, 'Minty toothpaste for oral hygiene'),
-            ('Hand Sanitizer (small)', 2.00, 2, 13, 1.20, 8, 'Small sanitizer bottle for on-the-go'),
-            ('Pain Relievers (pack)', 5.00, 1, 5, 3.00, 3, 'Over-the-counter pain relief medication'),
-            ('Bandages (box)', 3.00, 0, 10, 2.00, 5, 'Box of adhesive bandages for minor cuts'),
-            ('Sunscreen (small)', 5.50, 6, 5, 3.50, 3, 'Small bottle of sunscreen for sun protection'),
+    for name in low_list:
+        result.extend([name] * low_default)
+        stats[name] = low_default
 
-            -- Household
-            ('Batteries (AA, pack of 4)', 4.00, 1, 5, 2.50, 3, 'Pack of 4 AA batteries'),
-            ('Light Bulbs (LED, 2-pack)', 6.00, 3, 3, 4.00, 2, 'Energy-efficient LED light bulbs'),
-            ('Trash Bags (small, 10-pack)', 3.00, 5, 10, 2.00, 5, 'Small trash bags for everyday use'),
-            ('Paper Towels (single roll)', 2.50, 3, 8, 1.50, 5, 'Single roll of paper towels'),
-            ('Multi-Surface Cleaner', 4.50, 2, 5, 3.00, 3, 'All-purpose cleaning spray'),
+    return result, stats
 
-            -- Others
-            ('Lottery Tickets', 2.00, 17, 20, 1.50, 10, 'Assorted lottery tickets'),
-            ('Newspaper', 1.50, 22, 20, 1.00, 5, 'Daily newspaper')
-        """
-    )
-    conn.commit()
+if st.button("🚀 Phân chia DATA"):
+    if not tv_names or not cs_names:
+        st.error("❗ Vui lòng nhập đầy đủ danh sách TV và CS")
+    else:
+        try:
+            # Cảnh báo nếu có tên chia ít không nằm trong danh sách
+            tv_invalid = tv_low - set(tv_names)
+            cs_invalid = cs_low - set(cs_names)
+            if tv_invalid:
+                st.warning(f"⚠️ Các tên TV chia ít không nằm trong danh sách TV: {', '.join(tv_invalid)}")
+            if cs_invalid:
+                st.warning(f"⚠️ Các tên CS chia ít không nằm trong danh sách CS: {', '.join(cs_invalid)}")
 
+            assigned_tv, tv_stats = assign_data(tv_names, tv_low, total_data, low_default)
+            assigned_cs, cs_stats = assign_data(cs_names, cs_low, total_data, low_default)
 
-def load_data(conn):
-    """Loads the inventory data from the database."""
-    cursor = conn.cursor()
+            max_len = max(len(assigned_tv), len(assigned_cs))
+            assigned_tv += [''] * (max_len - len(assigned_tv))
+            assigned_cs += [''] * (max_len - len(assigned_cs))
 
-    try:
-        cursor.execute("SELECT * FROM inventory")
-        data = cursor.fetchall()
-    except:
-        return None
+            df = pd.DataFrame({"Tên TV": assigned_tv, "Tên CS": assigned_cs})
 
-    df = pd.DataFrame(
-        data,
-        columns=[
-            "id",
-            "item_name",
-            "price",
-            "units_sold",
-            "units_left",
-            "cost_price",
-            "reorder_point",
-            "description",
-        ],
-    )
+            st.subheader("📊 Kết quả phân chia")
+            st.dataframe(df, use_container_width=True)
 
-    return df
+            st.subheader("📈 Thống kê")
+            col3, col4 = st.columns(2)
+            with col3:
+                st.markdown("### 📌 TV")
+                st.dataframe(pd.DataFrame(tv_stats.items(), columns=["Tên TV", "Số lượng"]))
+            with col4:
+                st.markdown("### 📌 CS")
+                st.dataframe(pd.DataFrame(cs_stats.items(), columns=["Tên CS", "Số lượng"]))
 
+            # Xuất file Excel
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                df.to_excel(writer, index=False, sheet_name="PhanCong")
+                workbook = writer.book
+                worksheet = writer.sheets["PhanCong"]
+                for col_idx, name_list in enumerate([tv_names, cs_names]):
+                    for i, name in enumerate(name_list):
+                        color = "#D9E1F2" if i % 2 == 0 else "#FCE4D6"
+                        cell_format = workbook.add_format({'bg_color': color})
+                        for row_num, val in enumerate(df.iloc[:, col_idx]):
+                            if val == name:
+                                worksheet.write(row_num + 1, col_idx, val, cell_format)
 
-def update_data(conn, df, changes):
-    """Updates the inventory data in the database."""
-    cursor = conn.cursor()
+            st.download_button(
+                label="📥 Tải file Excel kết quả",
+                data=output.getvalue(),
+                file_name="phan_cong_data_TV_CS.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
 
-    if changes["edited_rows"]:
-        deltas = st.session_state.inventory_table["edited_rows"]
-        rows = []
-
-        for i, delta in deltas.items():
-            row_dict = df.iloc[i].to_dict()
-            row_dict.update(delta)
-            rows.append(row_dict)
-
-        cursor.executemany(
-            """
-            UPDATE inventory
-            SET
-                item_name = :item_name,
-                price = :price,
-                units_sold = :units_sold,
-                units_left = :units_left,
-                cost_price = :cost_price,
-                reorder_point = :reorder_point,
-                description = :description
-            WHERE id = :id
-            """,
-            rows,
-        )
-
-    if changes["added_rows"]:
-        cursor.executemany(
-            """
-            INSERT INTO inventory
-                (id, item_name, price, units_sold, units_left, cost_price, reorder_point, description)
-            VALUES
-                (:id, :item_name, :price, :units_sold, :units_left, :cost_price, :reorder_point, :description)
-            """,
-            (defaultdict(lambda: None, row) for row in changes["added_rows"]),
-        )
-
-    if changes["deleted_rows"]:
-        cursor.executemany(
-            "DELETE FROM inventory WHERE id = :id",
-            ({"id": int(df.loc[i, "id"])} for i in changes["deleted_rows"]),
-        )
-
-    conn.commit()
-
-
-# -----------------------------------------------------------------------------
-# Draw the actual page, starting with the inventory table.
-
-# Set the title that appears at the top of the page.
-"""
-# :shopping_bags: Inventory tracker
-
-**Welcome to Alice's Corner Store's intentory tracker!**
-This page reads and writes directly from/to our inventory database.
-"""
-
-st.info(
-    """
-    Use the table below to add, remove, and edit items.
-    And don't forget to commit your changes when you're done.
-    """
-)
-
-# Connect to database and create table if needed
-conn, db_was_just_created = connect_db()
-
-# Initialize data.
-if db_was_just_created:
-    initialize_data(conn)
-    st.toast("Database initialized with some sample data.")
-
-# Load data from database
-df = load_data(conn)
-
-# Display data with editable table
-edited_df = st.data_editor(
-    df,
-    disabled=["id"],  # Don't allow editing the 'id' column.
-    num_rows="dynamic",  # Allow appending/deleting rows.
-    column_config={
-        # Show dollar sign before price columns.
-        "price": st.column_config.NumberColumn(format="$%.2f"),
-        "cost_price": st.column_config.NumberColumn(format="$%.2f"),
-    },
-    key="inventory_table",
-)
-
-has_uncommitted_changes = any(len(v) for v in st.session_state.inventory_table.values())
-
-st.button(
-    "Commit changes",
-    type="primary",
-    disabled=not has_uncommitted_changes,
-    # Update data in database
-    on_click=update_data,
-    args=(conn, df, st.session_state.inventory_table),
-)
-
-
-# -----------------------------------------------------------------------------
-# Now some cool charts
-
-# Add some space
-""
-""
-""
-
-st.subheader("Units left", divider="red")
-
-need_to_reorder = df[df["units_left"] < df["reorder_point"]].loc[:, "item_name"]
-
-if len(need_to_reorder) > 0:
-    items = "\n".join(f"* {name}" for name in need_to_reorder)
-
-    st.error(f"We're running dangerously low on the items below:\n {items}")
-
-""
-""
-
-st.altair_chart(
-    # Layer 1: Bar chart.
-    alt.Chart(df)
-    .mark_bar(
-        orient="horizontal",
-    )
-    .encode(
-        x="units_left",
-        y="item_name",
-    )
-    # Layer 2: Chart showing the reorder point.
-    + alt.Chart(df)
-    .mark_point(
-        shape="diamond",
-        filled=True,
-        size=50,
-        color="salmon",
-        opacity=1,
-    )
-    .encode(
-        x="reorder_point",
-        y="item_name",
-    ),
-    use_container_width=True,
-)
-
-st.caption("NOTE: The :diamonds: location shows the reorder point.")
-
-""
-""
-""
-
-# -----------------------------------------------------------------------------
-
-st.subheader("Best sellers", divider="orange")
-
-""
-""
-
-st.altair_chart(
-    alt.Chart(df)
-    .mark_bar(orient="horizontal")
-    .encode(
-        x="units_sold",
-        y=alt.Y("item_name").sort("-x"),
-    ),
-    use_container_width=True,
-)
+        except ValueError as e:
+            st.error(f"🚫 Lỗi: {str(e)}")
