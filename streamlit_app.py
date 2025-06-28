@@ -95,12 +95,29 @@ if st.button("🚀 Phân chia DATA"):
             st.subheader("📋 Copy nhanh sang Excel / Google Sheets")
             components.html(f"""
                 <textarea id="dataArea" rows="15" style="width:100%">{csv_str}</textarea>
-                <button onclick="navigator.clipboard.writeText(document.getElementById('dataArea').value)"
+                <button id="copyBtn" onclick="copyToClipboard()"
                         style="margin-top:10px;padding:6px 16px;font-weight:bold;background-color:#4CAF50;color:white;border:none;border-radius:4px;cursor:pointer">
                     📋 Copy vào Clipboard
                 </button>
-                <p style="font-size: 0.9rem; color: grey;">➡️ Dán vào Excel hoặc Google Sheets sau khi bấm nút copy.</p>
-            """, height=400)
+                <p id="copyMsg" style="font-size: 0.9rem; color: grey; margin-top:5px;"></p>
+            
+                <script>
+                function copyToClipboard() {
+                    const text = document.getElementById("dataArea").value;
+                    navigator.clipboard.writeText(text).then(function() {
+                        var btn = document.getElementById("copyBtn");
+                        btn.innerHTML = "✅ Đã copy!";
+                        btn.style.backgroundColor = "#2E7D32";
+                        document.getElementById("copyMsg").innerText = "➡️ Dán vào Excel hoặc Google Sheets";
+                        setTimeout(function() {
+                            btn.innerHTML = "📋 Copy vào Clipboard";
+                            btn.style.backgroundColor = "#4CAF50";
+                        }, 2000);
+                    });
+                }
+                </script>
+            """, height=420)
+
 
             # st.subheader("📊 Kết quả phân chia")
             # st.dataframe(df, use_container_width=True)
