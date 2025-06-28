@@ -4,7 +4,7 @@ import math
 import io
 
 st.set_page_config(page_title="Phân chia DATA thông minh", layout="wide")
-st.title("📊 Chia Đều DATA Cho TV và CS (Có hỗ trợ nhân sự chia ít)")
+st.title("📊 Chia Đều DATA Cho TV và CS")
 
 # Input từ người dùng
 with st.sidebar:
