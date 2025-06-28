@@ -85,8 +85,15 @@ if st.button("🚀 Phân chia DATA"):
 
             df = pd.DataFrame({"Tên TV": assigned_tv, "Tên CS": assigned_cs})
 
+            # st.subheader("📊 Kết quả phân chia")
+            # st.dataframe(df, use_container_width=True)
             st.subheader("📊 Kết quả phân chia")
             st.dataframe(df, use_container_width=True)
+            
+            st.subheader("📋 Copy nhanh sang Excel / Google Sheets")
+            csv_str = df.to_csv(sep='\t', index=False)
+            st.text_area("📎 Dữ liệu dạng bảng (Tab Separated):", value=csv_str, height=300)
+            st.caption("➡️ Ctrl+A → Ctrl+C để copy toàn bộ và dán trực tiếp vào Excel hoặc Google Sheets.")
 
             st.subheader("📈 Thống kê")
             col3, col4 = st.columns(2)
