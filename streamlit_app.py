@@ -3,27 +3,39 @@ import pandas as pd
 import math
 import io
 import streamlit.components.v1 as components
+
 st.set_page_config(page_title="Phân chia DATA thông minh", layout="wide")
 st.title("📊 Chia Đều DATA Cho TV và CS")
 
-# Input từ người dùng
+# ============ CONFIG ============ #
 with st.sidebar:
     st.header("⚙️ Cấu hình")
-    total_data = st.number_input("Tổng số lượng DATA:", min_value=1, step=1, help="Tổng lượng data bạn muốn chia đều")
-    low_default = st.number_input("Số dòng chia ít (default):", min_value=1, value=9, step=1, help="Những người được đánh dấu 'chia ít' sẽ nhận số dòng này")
+    total_data = st.number_input("Tổng số lượng DATA:", min_value=1, step=1)
 
-st.markdown("---")
+    chia_kieu = st.radio(
+        "🔧 Cách chia cho nhóm 'chia ít':",
+        ["Số dòng mỗi người", "% tổng DATA của cả nhóm"],
+        index=0
+    )
 
+    if chia_kieu == "Số dòng mỗi người":
+        low_default = st.number_input("🔢 Số dòng chia cho mỗi người 'chia ít':", min_value=1, value=10)
+        low_percent = None
+    else:
+        low_percent = st.slider("📊 % tổng DATA chia cho nhóm chia ít:", 1, 100, 40)
+        low_default = None
+
+# ============ INPUT TÊN ============ #
 col1, col2 = st.columns(2)
 with col1:
-    tv_names_raw = st.text_area("📥 Danh sách Tư Vấn (TV):", placeholder="Nhập tên, cách nhau bởi dấu phẩy hoặc xuống dòng", help="Những người cần chia DATA bên nhóm TV")
-    tv_low_raw = st.text_area("🔽 Tên TV chia ít DATA:", placeholder="Không bắt buộc", help="Nhập tên người TV cần chia ít DATA")
+    tv_names_raw = st.text_area("📥 Danh sách Tư Vấn (TV):")
+    tv_low_raw = st.text_area("🔽 Tên TV chia ít DATA (tùy chọn):")
 
 with col2:
-    cs_names_raw = st.text_area("📥 Danh sách Chăm Sóc (CS):", placeholder="Nhập tên, cách nhau bởi dấu phẩy hoặc xuống dòng", help="Những người cần chia DATA bên nhóm CS")
-    cs_low_raw = st.text_area("🔽 Tên CS chia ít DATA:", placeholder="Không bắt buộc", help="Nhập tên người CS cần chia ít DATA")
+    cs_names_raw = st.text_area("📥 Danh sách Chăm Sóc (CS):")
+    cs_low_raw = st.text_area("🔽 Tên CS chia ít DATA (tùy chọn):")
 
-# Xử lý input
+# ============ XỬ LÝ INPUT ============ #
 def parse_names(raw):
     return [name.strip() for name in raw.replace(",", "\n").splitlines() if name.strip()]
 
@@ -32,19 +44,33 @@ cs_names = parse_names(cs_names_raw)
 tv_low = set(parse_names(tv_low_raw))
 cs_low = set(parse_names(cs_low_raw))
 
-# Hàm phân bổ data
-
-def assign_data(names, low_names, total, low_default=9):
+# ============ PHÂN CHIA ============ #
+def assign_data(names, low_names, total, low_default=None, low_percent=None):
     low_list = [name for name in names if name in low_names]
     normal_list = [name for name in names if name not in low_names]
 
-    total_low = low_default * len(low_list)
+    if not names:
+        return [], {}
+
+    if low_default is not None:
+        low_value = low_default
+        total_low = low_value * len(low_list)
+    elif low_percent is not None:
+        total_low = math.floor((low_percent / 100) * total)
+        if len(low_list) == 0:
+            low_value = 0
+        else:
+            low_value = total_low // len(low_list)
+        total_low = low_value * len(low_list)
+    else:
+        raise ValueError("Thiếu thông số chia ít")
+
     remaining = total - total_low
 
     if remaining < 0:
-        raise ValueError("Tổng số DATA quá nhỏ để chia cho nhóm 'chia ít'")
+        raise ValueError("❗ Tổng số DATA quá nhỏ để chia cho nhóm 'chia ít'")
     if remaining > 0 and len(normal_list) == 0:
-        raise ValueError("Không có ai để chia phần DATA còn lại")
+        raise ValueError("❗ Không có ai trong nhóm thường để chia phần còn lại")
 
     per_person = remaining // len(normal_list) if normal_list else 0
     extra = remaining % len(normal_list) if normal_list else 0
@@ -58,51 +84,51 @@ def assign_data(names, low_names, total, low_default=9):
         stats[name] = count
 
     for name in low_list:
-        result.extend([name] * low_default)
-        stats[name] = low_default
+        result.extend([name] * low_value)
+        stats[name] = low_value
 
     return result, stats
 
+# ============ XỬ LÝ KHI ẤN NÚT ============ #
 if st.button("🚀 Phân chia DATA"):
     if not tv_names or not cs_names:
         st.error("❗ Vui lòng nhập đầy đủ danh sách TV và CS")
     else:
         try:
-            # Cảnh báo nếu có tên chia ít không nằm trong danh sách
             tv_invalid = tv_low - set(tv_names)
             cs_invalid = cs_low - set(cs_names)
             if tv_invalid:
-                st.warning(f"⚠️ Các tên TV chia ít không nằm trong danh sách TV: {', '.join(tv_invalid)}")
+                st.warning(f"⚠️ TV chia ít không có trong danh sách: {', '.join(tv_invalid)}")
             if cs_invalid:
-                st.warning(f"⚠️ Các tên CS chia ít không nằm trong danh sách CS: {', '.join(cs_invalid)}")
+                st.warning(f"⚠️ CS chia ít không có trong danh sách: {', '.join(cs_invalid)}")
 
-            assigned_tv, tv_stats = assign_data(tv_names, tv_low, total_data, low_default)
-            assigned_cs, cs_stats = assign_data(cs_names, cs_low, total_data, low_default)
+            # Phân chia
+            assigned_tv, tv_stats = assign_data(tv_names, tv_low, total_data, low_default, low_percent)
+            assigned_cs, cs_stats = assign_data(cs_names, cs_low, total_data, low_default, low_percent)
 
+            # Merge TV & CS cùng hàng
             max_len = max(len(assigned_tv), len(assigned_cs))
             assigned_tv += [''] * (max_len - len(assigned_tv))
             assigned_cs += [''] * (max_len - len(assigned_cs))
 
             df = pd.DataFrame({"Tên TV": assigned_tv, "Tên CS": assigned_cs})
 
+            # Hiển thị kết quả
             st.subheader("📊 Kết quả phân chia")
             st.dataframe(df, use_container_width=True)
-            
-            # Chuẩn bị chuỗi tab-separated
-            csv_str = df.to_csv(sep='\t', index=False, header=False)
+
+            # Copy nhanh
+            st.subheader("📋 Copy nhanh sang Excel / Google Sheets")
+            csv_str = df.to_csv(sep="\t", index=False, header=False)
             escaped_csv_str = csv_str.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-            
-            # Tạo giao diện copy
-            st.subheader("📋 Copy nhanh sang Excel / Google Sheets")
-            components.html(f"""
+            html_code = f"""
                 <textarea id="dataArea" rows="15" style="width:100%">{escaped_csv_str}</textarea>
                 <button id="copyBtn" onclick="copyToClipboard()"
                         style="margin-top:10px;padding:6px 16px;font-weight:bold;background-color:#4CAF50;color:white;border:none;border-radius:4px;cursor:pointer">
                     📋 Copy vào Clipboard
                 </button>
                 <p id="copyMsg" style="font-size: 0.9rem; color: grey; margin-top:5px;"></p>
-            
                 <script>
                 function copyToClipboard() {{
                     const text = document.getElementById("dataArea").value;
@@ -118,17 +144,10 @@ if st.button("🚀 Phân chia DATA"):
                     }});
                 }}
                 </script>
-            """, height=420)
+            """
+            components.html(html_code, height=420)
 
-
-
-            # st.subheader("📊 Kết quả phân chia")
-            # st.dataframe(df, use_container_width=True)
-            # st.subheader("📋 Copy nhanh sang Excel / Google Sheets")
-            # csv_str = df.to_csv(sep='\t', index=False)
-            # st.text_area("📎 Dữ liệu dạng bảng (Tab Separated):", value=csv_str, height=300)
-            # st.caption("➡️ Ctrl+A → Ctrl+C để copy toàn bộ và dán trực tiếp vào Excel hoặc Google Sheets.")
-
+            # Thống kê
             st.subheader("📈 Thống kê")
             col3, col4 = st.columns(2)
             with col3:
@@ -138,26 +157,11 @@ if st.button("🚀 Phân chia DATA"):
                 st.markdown("### 📌 CS")
                 st.dataframe(pd.DataFrame(cs_stats.items(), columns=["Tên CS", "Số lượng"]))
 
-            # Xuất file Excel
+            # Xuất Excel
             output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
                 df.to_excel(writer, index=False, sheet_name="PhanCong")
-                workbook = writer.book
-                worksheet = writer.sheets["PhanCong"]
-                for col_idx, name_list in enumerate([tv_names, cs_names]):
-                    for i, name in enumerate(name_list):
-                        color = "#D9E1F2" if i % 2 == 0 else "#FCE4D6"
-                        cell_format = workbook.add_format({'bg_color': color})
-                        for row_num, val in enumerate(df.iloc[:, col_idx]):
-                            if val == name:
-                                worksheet.write(row_num + 1, col_idx, val, cell_format)
-
-            st.download_button(
-                label="📥 Tải file Excel kết quả",
-                data=output.getvalue(),
-                file_name="phan_cong_data_TV_CS.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+            st.download_button("📥 Tải file Excel kết quả", output.getvalue(), "phan_cong.xlsx")
 
         except ValueError as e:
-            st.error(f"🚫 Lỗi: {str(e)}")
+            st.error(str(e))
