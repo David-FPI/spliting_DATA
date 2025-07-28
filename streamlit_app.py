@@ -106,9 +106,9 @@ with tabs[1]:
             # 🚀 Thêm xử lý Mã Team
             team_map = {
                 "1": "1Hưng",
-                "2": "1Kiệt",
-                "3": "1Ruby",
-                "4": "1Sơn"
+                "2": "2Kiệt",
+                "3": "3Ruby",
+                "4": "4Sơn"
             }
 
             team_labels = []
