@@ -22,9 +22,11 @@ def load_groups():
 
 # ===== Hàm chính chia data theo dây chuyền bánh xe ===== #
 def chia_data_day_chuyen(danh_sach_nhan_su, groups, total_data, last_person=None):
-    group_a = [name for name in danh_sach_nhan_su if name in groups.get("A", [])]
-    group_b = [name for name in danh_sach_nhan_su if name in groups.get("B", [])]
-    group_c = [name for name in danh_sach_nhan_su if name in groups.get("C", [])]
+    # Sắp xếp lại danh sách nhân sự theo đúng thứ tự nhóm A → B → C
+    group_a = [name for name in groups.get("A", []) if name in danh_sach_nhan_su]
+    group_b = [name for name in groups.get("B", []) if name in danh_sach_nhan_su]
+    group_c = [name for name in groups.get("C", []) if name in danh_sach_nhan_su]
+
 
     def make_sole_queue(names, count):
         if not names:
