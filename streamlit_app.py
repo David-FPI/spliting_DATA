@@ -124,6 +124,15 @@ with tabs[1]:
                 "Mã Team": team_labels,
                 "Nhân sự nhận DATA": result
             })
+            # 📈 Thống kê tổng số DATA mỗi người nhận
+            thong_ke = pd.Series(result).value_counts().reset_index()
+            thong_ke.columns = ["Nhân sự", "Số DATA nhận"]
+
+            st.subheader("📈 Thống kê số DATA mỗi nhân sự")
+            st.dataframe(thong_ke, use_container_width=True)
+
+            # Cho phép tải file thống kê
+            st.download_button("📥 Tải file thống kê", thong_ke.to_csv(index=False).encode(), "thong_ke_data.csv")
 
             st.subheader("📊 Kết quả phân chia")
             st.dataframe(df, use_container_width=True)
